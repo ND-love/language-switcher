@@ -19,7 +19,8 @@ LOG_FILE = os.path.join(LOGS_DIR, "laswitch.log")
 
 DEFAULT_SETTINGS = {
     "hotkey": "f8",
-    "mode": "all"
+    "mode": "all",
+    "auto_correct_enabled": False,
 }
 
 

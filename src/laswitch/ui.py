@@ -7,6 +7,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QCheckBox,
     QLabel,
     QMainWindow,
     QMenu,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QWidget,
 )
+from .auto_correct import AutoCorrectEngine
 
 from .manual_switcher import LayoutSwitcherLogic
 from .utils import HK_TRANS_DICT, load_settings, save_settings
@@ -48,10 +50,11 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LaSwitch")
-        self.setFixedSize(360, 240)
+        self.setFixedSize(380, 280)
 
         self.settings = load_settings()
         self.logic = LayoutSwitcherLogic(status_callback=self.set_status)
+        self.auto_engine = AutoCorrectEngine(status_callback=self.set_status)
         self.logic.mode = self.settings["mode"]
 
         self.hotkey_hook = None
@@ -61,6 +64,15 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         self.setup_tray()
         self.register_hotkey(self.settings["hotkey"])
+
+    def toggle_auto_correct(self, checked: bool):
+        self.settings["auto_correct_enabled"] = checked
+        save_settings(self.settings)
+
+        if checked:
+            self.auto_engine.start()
+        else:
+            self.auto_engine.stop()
 
     def setup_ui(self):
         central_widget = QWidget()
@@ -96,6 +108,11 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self.radio_selection)
         layout.addWidget(self.radio_all)
+
+        self.chk_auto = QCheckBox("Автокоррекция последнего слова (safe)")
+        self.chk_auto.setChecked(self.settings.get("auto_correct_enabled", False))
+        self.chk_auto.toggled.connect(self.toggle_auto_correct)
+        layout.addWidget(self.chk_auto)
 
         self.btn_hide = QPushButton("Свернуть в трей")
         self.btn_hide.clicked.connect(self.hide)
@@ -192,6 +209,8 @@ class MainWindow(QMainWindow):
                 "Сочетание должно содержать хотя бы одну основную клавишу.",
             )
             self.register_hotkey(self.settings["hotkey"])
+            if self.settings.get("auto_correct_enabled", False):
+                self.auto_engine.start()
             self.set_status("Ошибка записи")
         else:
             self.settings["hotkey"] = new_hotkey
@@ -240,6 +259,7 @@ class MainWindow(QMainWindow):
 
     def exit_app(self):
         self.remove_current_hotkey()
+        self.auto_engine.stop()
         self.really_quit = True
         self.tray_icon.hide()
         QApplication.quit()
